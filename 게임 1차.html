@@ -1,0 +1,1402 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>피자집 현실 운영 시뮬레이터 (풀버전 · 단일파일)</title>
+<style>
+  :root{
+    --bg:#0b0f14; --card:#121824; --card2:#0f1520; --line:#1f2a3a;
+    --text:#e8eefc; --muted:#9fb0cc; --good:#4ade80; --warn:#fbbf24; --bad:#fb7185;
+    --accent:#2563eb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  h1{font-size:18px;margin:0 0 10px}
+  .grid{display:grid;grid-template-columns:1fr;gap:12px}
+  @media (min-width:980px){ .grid{grid-template-columns:420px 1fr} }
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .card.hud{background:linear-gradient(180deg,#121824,#0f1520); position:sticky; top:12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .col{flex:1;min-width:160px}
+  .kpi{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kpi .box{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px}
+  .kpi .t{font-size:12px;color:var(--muted)}
+  .kpi .v{font-size:16px;margin-top:6px}
+  .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12px;background:#0e1420}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
+  input[type="number"], input[type="text"], select, textarea{
+    width:100%; padding:10px;border-radius:10px;border:1px solid var(--line); background:#0e1420; color:var(--text);
+  }
+  textarea{min-height:140px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px}
+  input[type="range"]{width:100%}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  button{padding:10px 12px;border-radius:12px;border:1px solid var(--line); background:#0e1420; color:var(--text); cursor:pointer}
+  button.primary{background:var(--accent);border-color:#2b74ff}
+  button.danger{background:#b91c1c;border-color:#ef4444}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+  .tab{padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:#0e1420;color:var(--muted);cursor:pointer}
+  .tab.active{background:#162447;color:var(--text);border-color:#24406f}
+  .small{font-size:12px;color:var(--muted);line-height:1.4}
+  .log{white-space:pre-wrap;font-size:12px;color:#cfe0ff;background:#0b1220;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:160px;max-height:360px;overflow:auto}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--line);padding:8px 6px;font-size:12px}
+  th{color:var(--muted);text-align:right}
+  th:first-child, td:first-child{text-align:left}
+  .good{color:var(--good)}
+  .warn{color:var(--warn)}
+  .bad{color:var(--bad)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🍕 피자집 현실 운영 시뮬레이터 (풀버전 · 단일파일)</h1>
+
+  <div class="grid">
+    <!-- LEFT: HUD + CONTROLS -->
+    <div class="card hud">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div>
+          <div class="pill">📅 <b id="hudMonth">1</b>개월차 · DAY <b id="hudDay">1</b>/<span id="hudDPM">30</span></div>
+        </div>
+        <div class="pill">🧠 난이도: <b id="hudDiff">REAL</b></div>
+      </div>
+
+      <div style="height:10px"></div>
+
+      <div class="kpi">
+        <div class="box">
+          <div class="t">💵 현금</div>
+          <div class="v" id="kpiCash">-</div>
+        </div>
+        <div class="box">
+          <div class="t">💳 카드 사용액(합)</div>
+          <div class="v" id="kpiCardUsed">-</div>
+        </div>
+        <div class="box">
+          <div class="t">📉 신용도</div>
+          <div class="v" id="kpiCredit">-</div>
+        </div>
+        <div class="box">
+          <div class="t">⭐ 리뷰/노출</div>
+          <div class="v" id="kpiQual">-</div>
+        </div>
+      </div>
+
+      <div style="height:10px"></div>
+
+      <div class="row">
+        <div class="col">
+          <label>운영 버튼</label>
+          <div class="btns">
+            <button class="primary" id="btnNextDay">하루 진행 ▶</button>
+            <button id="btnNext7">7일 자동 ▶</button>
+            <button id="btnFinishMonth">이번 달 끝까지 ▶</button>
+            <button class="danger" id="btnReset">초기화</button>
+          </div>
+          <div class="small" style="margin-top:8px">
+            - <b>현금 마이너스 가능</b>하지만, <b>현금만 가능한 지출</b>(임대료/급여/세금/4대보험)을 못 내면 리스크가 누적됩니다.<br>
+            - 카드 한도 초과 또는 현금필수 미납 유예 초과 시 게임오버.
+          </div>
+        </div>
+      </div>
+
+      <div style="height:6px"></div>
+
+      <label>오늘 전략(게임형)</label>
+      <div class="row">
+        <div class="col">
+          <div class="pill">직접배달 전환율(가게배달 중): <b id="lblSelfShare">60%</b></div>
+          <input id="rngSelfShare" type="range" min="0" max="100" value="60" />
+        </div>
+        <div class="col">
+          <div class="pill">전화 마케팅: <b id="lblMk">OFF</b></div>
+          <button id="btnMk" style="width:100%">📞 전화 마케팅 토글</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <div class="pill">대량사입(원가절감): <b id="lblBulk">OFF</b></div>
+          <button id="btnBulk" style="width:100%">📦 대량사입 토글</button>
+        </div>
+        <div class="col">
+          <div class="pill">직원(활성): <b id="lblEmp">0</b>명</div>
+          <div class="btns">
+            <button id="btnHire">➕ 직원 고용</button>
+            <button id="btnFire">➖ 직원 해고</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:6px"></div>
+
+      <label>채널 믹스(합 100%)</label>
+      <div class="row">
+        <div class="col">
+          <div class="pill">플랫폼 <b id="lblMixP">60%</b></div>
+          <input id="mixPlatform" type="range" min="0" max="100" value="60" />
+        </div>
+        <div class="col">
+          <div class="pill">전화 <b id="lblMixH">20%</b></div>
+          <input id="mixPhone" type="range" min="0" max="100" value="20" />
+        </div>
+        <div class="col">
+          <div class="pill">가게배달 <b id="lblMixS">20%</b></div>
+          <input id="mixStore" type="range" min="0" max="100" value="20" />
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: TABS -->
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active" data-tab="tabDash">대시보드</div>
+        <div class="tab" data-tab="tabSettings">설정(현실값)</div>
+        <div class="tab" data-tab="tabJson">STATE JSON</div>
+        <div class="tab" data-tab="tabKpi">월/일 KPI</div>
+      </div>
+
+      <!-- DASH -->
+      <div id="tabDash">
+        <div class="row">
+          <div class="col">
+            <div class="card" style="padding:12px;background:var(--card2)">
+              <b>오늘 결과</b>
+              <div class="small" id="todaySummary" style="margin-top:8px">-</div>
+            </div>
+            <div class="card" style="padding:12px;background:var(--card2)">
+              <b>로그</b>
+              <div class="log" id="log"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div id="tabSettings" style="display:none">
+        <div class="small">여기 숫자는 전부 “게임 유저가 수기 수정” 가능. 바꾸고 <b>적용</b> 누르면 시뮬레이션에 반영됨.</div>
+
+        <div class="row">
+          <div class="col">
+            <label>가격/쿠폰</label>
+            <div class="row">
+              <div class="col">
+                <label>콤비 라지 판매가</label>
+                <input id="s_price" type="number" step="100" />
+              </div>
+              <div class="col">
+                <label>쿠폰(고정)</label>
+                <input id="s_coupon" type="number" step="100" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col">
+                <label>리뷰이벤트 추가금(매출+)</label>
+                <input id="s_reviewUp" type="number" step="10" />
+              </div>
+              <div class="col">
+                <label>리뷰이벤트 비용(지출+)</label>
+                <input id="s_reviewCost" type="number" step="10" />
+              </div>
+            </div>
+
+            <label>원가/포장</label>
+            <div class="row">
+              <div class="col">
+                <label>음식 원가</label>
+                <input id="s_foodCost" type="number" step="10" />
+              </div>
+              <div class="col">
+                <label>포장 원가</label>
+                <input id="s_packCost" type="number" step="10" />
+              </div>
+            </div>
+
+            <label>플랫폼 수수료</label>
+            <div class="row">
+              <div class="col">
+                <label>중개 수수료율</label>
+                <input id="s_pf_fee" type="number" step="0.01" />
+              </div>
+              <div class="col">
+                <label>결제 수수료율</label>
+                <input id="s_pf_payfee" type="number" step="0.01" />
+              </div>
+            </div>
+
+            <label>배달 비용</label>
+            <div class="row">
+              <div class="col">
+                <label>대행 배달비(점포부담/건)</label>
+                <input id="s_agency" type="number" step="100" />
+              </div>
+              <div class="col">
+                <label>직접배달 가변비(건)</label>
+                <input id="s_selfVar" type="number" step="50" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="col">
+                <label>오토바이 고정비(월)</label>
+                <input id="s_bikeFixed" type="number" step="10000" />
+              </div>
+              <div class="col">
+                <label>전화 배달비(고객부담)</label>
+                <input id="s_phoneFee" type="number" step="100" />
+              </div>
+            </div>
+
+            <label>고정비(월)</label>
+            <div class="row">
+              <div class="col"><label>임대료(현금필수)</label><input id="s_rent" type="number" step="10000" /></div>
+              <div class="col"><label>인건비(현금필수)</label><input id="s_salary" type="number" step="10000" /></div>
+            </div>
+            <div class="row">
+              <div class="col"><label>관리비</label><input id="s_maint" type="number" step="10000" /></div>
+              <div class="col"><label>공과금</label><input id="s_util" type="number" step="10000" /></div>
+            </div>
+            <div class="row">
+              <div class="col"><label>로열티</label><input id="s_royalty" type="number" step="10000" /></div>
+              <div class="col"><label>광고비(플랫폼/자체 포함)</label><input id="s_ads" type="number" step="10000" /></div>
+            </div>
+
+            <label>카드(메인)</label>
+            <div class="row">
+              <div class="col"><label>한도</label><input id="s_cardLimit" type="number" step="100000" /></div>
+              <div class="col"><label>월 이자율</label><input id="s_cardInt" type="number" step="0.001" /></div>
+            </div>
+
+            <div class="btns">
+              <button class="primary" id="btnApplySettings">설정 적용</button>
+              <button id="btnPresetUser">네 기준(콤비/쿠폰/마진) 프리셋</button>
+            </div>
+
+            <div class="small" style="margin-top:8px">
+              * “플랫폼 마진 2,600”을 맞추려면 수수료율/원가/가격/쿠폰이 현실값으로 들어가야 함. (프리셋 버튼이 기본으로 네 값 세팅)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- JSON -->
+      <div id="tabJson" style="display:none">
+        <div class="small">STATE 전체를 그대로 수정/저장/복구 가능. (Codex로 옮길 때 이 JSON이 뼈대)</div>
+        <label>STATE JSON</label>
+        <textarea id="jsonBox"></textarea>
+        <div class="btns">
+          <button class="primary" id="btnLoadJson">JSON 적용</button>
+          <button id="btnExportJson">JSON 내보내기(클립보드)</button>
+          <button id="btnRefreshJson">현재 STATE로 갱신</button>
+        </div>
+        <div class="small" id="jsonMsg"></div>
+      </div>
+
+      <!-- KPI -->
+      <div id="tabKpi" style="display:none">
+        <div class="row">
+          <div class="col">
+            <b>월 KPI</b>
+            <div class="small">월말에 고정비/카드정산/부가세/이벤트까지 반영된 결과.</div>
+            <div style="height:8px"></div>
+            <table>
+              <thead>
+                <tr>
+                  <th>월</th><th>주문</th><th>매출</th><th>변동비</th><th>고정비</th><th>세금</th><th>이자</th><th>손익</th><th>현금</th><th>카드</th>
+                </tr>
+              </thead>
+              <tbody id="tblMonthly"></tbody>
+            </table>
+
+            <div style="height:12px"></div>
+
+            <b>최근 10일 KPI</b>
+            <div style="height:8px"></div>
+            <table>
+              <thead>
+                <tr>
+                  <th>일</th><th>주문</th><th>취소</th><th>매출</th><th>비용</th><th>손익</th><th>리뷰</th><th>노출</th>
+                </tr>
+              </thead>
+              <tbody id="tblDaily"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/** =========================
+ *  0) 유틸
+ *  ========================= */
+const $ = (id)=>document.getElementById(id);
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+const round=(n)=>Math.round(n);
+const money=(n)=> (Math.round(n)).toLocaleString("ko-KR")+"원";
+const pct=(x)=> Math.round(x*100)+"%";
+function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+/** =========================
+ *  1) 초기 STATE (v1)
+ *  ========================= */
+const INITIAL_STATE = {
+  meta: { version:"pizza-sim-v1", timezone:"Asia/Seoul", daysPerMonth:30, vatCycleMonths:3 },
+  time: { month:1, day:1, totalDays:0 },
+  finance: {
+    cash: 500000,
+    allowCashNegative: true,
+    cards: [
+      { id:"card_main", name:"메인카드", active:true, limit:15000000, used:0, interestRateMonthly:0.015, minPayRate:0.10, lateFeeFlat:30000, utilizationSoftWarn:0.7, utilizationHardWarn:0.9 },
+      { id:"card_emergency", name:"비상카드", active:true, limit:8000000, used:0, interestRateMonthly:0.022, minPayRate:0.20, lateFeeFlat:50000, utilizationSoftWarn:0.7, utilizationHardWarn:0.9 }
+    ],
+    creditScore: 100,
+    creditScoreMin: 0,
+    creditScoreMax: 120,
+    paymentRules: {
+      cardPriority: ["card_main","card_emergency"],
+      cashOnlyCategories: ["rent","salary","four_insurance","tax_vat","tax_income"],
+      cardAllowedCategories: ["ingredients","packaging","platform_fee","payment_fee","delivery_agency","marketing","utilities_optional","royalty","insurance","bike_fixed","bike_variable","supplies"],
+      ifCashOnlyUnpaid: { mode:"event_then_gameover", graceDays:3 }
+    },
+    arrears: { // 현금필수 미납 추적
+      rentDays:0, salaryDays:0, taxDays:0
+    }
+  },
+  store: {
+    name:"피자집",
+    capacity: { baseOrdersPerHour:6, peakMultiplier:1.6, maxOrdersPerDayHardCap:120 },
+    staff: {
+      owners:[ {name:"사장A", salaryMonthly:0, active:true},{name:"사장B", salaryMonthly:0, active:true} ],
+      employees:[ {name:"직원1", salaryMonthly:2800000, active:false} ],
+      canHireMore:true,
+      hireCostOneTime:100000,
+      firePenaltyOneTime:200000,
+      fourInsuranceRate:0.09
+    },
+    fatigue: {
+      ownerFatigue:10, employeeFatigue:10, fatigueMax:100,
+      fatigueRecoveryPerDay:6,
+      fatigueIncrease: { perOrderMade:0.35, perSelfDelivery:0.55, peakHourExtra:0.25 },
+      effects: {
+        over70:{ capacityMultiplier:0.90, complaintMultiplier:1.20 },
+        over85:{ capacityMultiplier:0.75, complaintMultiplier:1.50 }
+      }
+    },
+    quality: { reviewScore:4.5, reviewScoreMin:2.5, reviewScoreMax:5.0, exposure:1.0, exposureMin:0.5, exposureMax:1.8 }
+  },
+  channels: {
+    mixPercent: { platform:60, phone:20, storeDelivery:20 },
+    platform: {
+      enabled:true,
+      feeRate:0.18,
+      paymentFeeRate:0.03,
+      fixedPerOrderFee:0,
+      merchantCouponShareRate:1.0,
+      storeDeliveryExtraFeeRate:0.02,
+      menuVisibilityBoostFromCoupon:1.12,
+      reviewBoost:1.05
+    },
+    phone: {
+      enabled:true,
+      marketingOn:false,
+      marketingDailyCost:20000,
+      deliveryFeeChargedToCustomer:500,
+      conversionBoostWhenMarketingOn:0.12,
+      conversionBoostWhenLowDeliveryFee:0.08,
+      lowDeliveryFeeThreshold:500
+    },
+    storeDelivery: {
+      enabled:true,
+      mode:"agency_then_self",
+      agency:{ costPerOrder:3200, payCategory:"delivery_agency" },
+      self:{
+        enabled:true,
+        shareOfStoreDelivery:0.60,
+        variableCostPerOrder:700,
+        bikeFixedMonthly:250000,
+        bikeOneTimePurchase:2500000,
+        bikePurchased:false,
+        payCategoryFixed:"bike_fixed",
+        payCategoryVar:"bike_variable"
+      }
+    }
+  },
+  pricing: {
+    couponDefault:10000,
+    couponLocked:true,
+    maxPrice: { medium:23900, large:27900, premiumLarge:31900 },
+    reviewEvent: { enabled:true, extraCharge:700, costPerOrder:400 }
+  },
+  menu: {
+    items: [
+      { id:"combo_large", name:"콤비네이션 라지", size:"large", basePrice:27900, foodCost:5600, packagingCost:600, wasteRate:0.02, complaintRate:0.008, refundRateIfComplaint:0.6, forcedIngredientsShare:0.35 }
+    ],
+    sets: []
+  },
+  inventory: {
+    forcedItemsCount:15,
+    totalSuppliedItemsApprox:75,
+    bulkPurchase:{ enabled:false, discountRate:0.03, minOrderAmount:500000, storagePenaltyRate:0.01 }
+  },
+  fixedCostsMonthly: {
+    rent:2500000, maintenance:300000, utilities:600000, internetPhone:80000, pos:70000,
+    accounting:150000, insurance:80000, royalty:300000, franchiseAds:200000, platformAds:200000
+  },
+  tax: {
+    vat: { enabled:true, rate:0.1, cycleMonths:3, nextDueInMonths:3, dueCategory:"tax_vat", latePenaltyRate:0.03, lateCreditScorePenalty:30 },
+    incomeTax: { enabled:false, annualRateApprox:0.12, dueMonth:5, dueCategory:"tax_income" }
+  },
+  events: {
+    hqPressure: {
+      enabled:true, monthlyChance:0.25,
+      types:[ {type:"force_coupon",severity:1},{type:"force_item_purchase",severity:2},{type:"raise_franchise_ads",severity:1} ]
+    },
+    random: {
+      enabled:true, dailyChance:0.08,
+      types:[ {type:"big_order_spike",severity:2},{type:"rider_shortage",severity:2},{type:"ingredient_shortage",severity:1} ]
+    }
+  },
+  kpis: { daily:[], monthly:[] },
+  gameRules: {
+    gameOver:{ ifAllCardsOverLimit:true, ifCashOnlyUnpaidBeyondGrace:true, ifCreditScoreBelowMin:true },
+    warnings:{ cardUtilizationWarn:0.8, cashNegativeDaysWarn:7 }
+  }
+};
+
+let state = deepClone(INITIAL_STATE);
+let GAME_OVER = false;
+
+/** =========================
+ *  2) 로그
+ *  ========================= */
+function logLine(s){
+  const box = $("log");
+  box.textContent = (box.textContent ? box.textContent + "\n" : "") + s;
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog(){ $("log").textContent=""; }
+
+/** =========================
+ *  3) UI 탭
+ *  ========================= */
+document.querySelectorAll(".tab").forEach(t=>{
+  t.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    const id = t.dataset.tab;
+    ["tabDash","tabSettings","tabJson","tabKpi"].forEach(k=>$(k).style.display = (k===id?"block":"none"));
+    refreshTables();
+    refreshJsonBox();
+  });
+});
+
+/** =========================
+ *  4) 믹스 슬라이더 100% 보정
+ *  ========================= */
+let lastMix="platform";
+function syncMixLabels(){
+  $("lblMixP").textContent = $("mixPlatform").value + "%";
+  $("lblMixH").textContent = $("mixPhone").value + "%";
+  $("lblMixS").textContent = $("mixStore").value + "%";
+}
+function normalizeMixBy(last){
+  let p=+$("mixPlatform").value, h=+$("mixPhone").value, s=+$("mixStore").value;
+  const target=100, sum=p+h+s;
+  if(sum===target){ syncMixLabels(); return; }
+  if(last==="platform"){
+    const remain=target-p; const s2=h+s || 1;
+    h=Math.round(remain*(h/s2)); s=target-p-h;
+  }else if(last==="phone"){
+    const remain=target-h; const s2=p+s || 1;
+    p=Math.round(remain*(p/s2)); s=target-p-h;
+  }else{
+    const remain=target-s; const s2=p+h || 1;
+    p=Math.round(remain*(p/s2)); h=target-p-s;
+  }
+  $("mixPlatform").value=p; $("mixPhone").value=h; $("mixStore").value=s;
+  syncMixLabels();
+}
+["mixPlatform","mixPhone","mixStore"].forEach(id=>{
+  $(id).addEventListener("input", ()=>{
+    lastMix = id==="mixPlatform"?"platform":id==="mixPhone"?"phone":"store";
+    normalizeMixBy(lastMix);
+    state.channels.mixPercent.platform = +$("mixPlatform").value;
+    state.channels.mixPercent.phone = +$("mixPhone").value;
+    state.channels.mixPercent.storeDelivery = +$("mixStore").value;
+    refreshHUD();
+  });
+});
+
+/** =========================
+ *  5) 전략 버튼
+ *  ========================= */
+$("rngSelfShare").addEventListener("input", ()=>{
+  const v=+$("rngSelfShare").value;
+  $("lblSelfShare").textContent = v + "%";
+  state.channels.storeDelivery.self.shareOfStoreDelivery = v/100;
+});
+$("btnMk").addEventListener("click", ()=>{
+  state.channels.phone.marketingOn = !state.channels.phone.marketingOn;
+  $("lblMk").textContent = state.channels.phone.marketingOn ? "ON" : "OFF";
+  logLine(`📞 전화 마케팅 ${state.channels.phone.marketingOn?"ON":"OFF"}`);
+});
+$("btnBulk").addEventListener("click", ()=>{
+  state.inventory.bulkPurchase.enabled = !state.inventory.bulkPurchase.enabled;
+  $("lblBulk").textContent = state.inventory.bulkPurchase.enabled ? "ON" : "OFF";
+  logLine(`📦 대량사입 ${state.inventory.bulkPurchase.enabled?"ON":"OFF"}`);
+});
+function countActiveEmployees(){
+  return state.store.staff.employees.filter(e=>e.active).length;
+}
+function refreshEmpLabel(){
+  $("lblEmp").textContent = String(countActiveEmployees());
+}
+$("btnHire").addEventListener("click", ()=>{
+  const emp = state.store.staff.employees.find(e=>!e.active);
+  if(!emp){
+    // 새 슬롯 추가
+    if(!state.store.staff.canHireMore){ logLine("❌ 더 이상 고용 불가"); return; }
+    const idx=state.store.staff.employees.length+1;
+    state.store.staff.employees.push({name:`직원${idx}`, salaryMonthly:2800000, active:true});
+  }else{
+    emp.active=true;
+  }
+  // 고용비(카드 가능)
+  pay(state.store.staff.hireCostOneTime, "supplies", "고용비");
+  logLine("👤 직원 고용");
+  refreshEmpLabel(); refreshHUD();
+});
+$("btnFire").addEventListener("click", ()=>{
+  const emp = [...state.store.staff.employees].reverse().find(e=>e.active);
+  if(!emp){ logLine("ℹ️ 활성 직원 없음"); return; }
+  emp.active=false;
+  // 해고 페널티(현금 권장, 카드 가능으로 둠)
+  pay(state.store.staff.firePenaltyOneTime, "supplies", "해고 페널티");
+  logLine("👤 직원 해고");
+  refreshEmpLabel(); refreshHUD();
+});
+
+/** =========================
+ *  6) 결제 엔진 (현실 핵심)
+ *  ========================= */
+function getCardById(id){ return state.finance.cards.find(c=>c.id===id); }
+function allCardsOverLimit(){
+  const active = state.finance.cards.filter(c=>c.active);
+  return active.length>0 && active.every(c=>c.used >= c.limit);
+}
+function chargeToCard(amount){
+  let remaining = amount;
+  for(const cid of state.finance.paymentRules.cardPriority){
+    const card = getCardById(cid);
+    if(!card || !card.active) continue;
+    const avail = Math.max(0, card.limit - card.used);
+    const take = Math.min(avail, remaining);
+    card.used += take;
+    remaining -= take;
+    if(remaining<=0) break;
+  }
+  return remaining; // 남은 금액 (0이면 성공)
+}
+function markArrears(category){
+  const a = state.finance.arrears;
+  if(category==="rent") a.rentDays++;
+  if(category==="salary" || category==="four_insurance") a.salaryDays++;
+  if(category==="tax_vat" || category==="tax_income") a.taxDays++;
+}
+function pay(amount, category, memo){
+  amount = Math.max(0, amount||0);
+  if(amount===0) return {paid:0, cashUsed:0, cardUsed:0, unpaid:0};
+
+  const cashOnly = state.finance.paymentRules.cashOnlyCategories.includes(category);
+
+  // 1) 현금 결제 시도
+  let cashUsed = 0, cardUsed = 0, unpaid = 0;
+
+  if(state.finance.cash >= amount){
+    state.finance.cash -= amount;
+    cashUsed = amount;
+    return {paid:amount, cashUsed, cardUsed, unpaid};
+  }
+
+  // 현금 부족
+  const shortage = amount - Math.max(0, state.finance.cash);
+  // 현금은 0까지 털기
+  cashUsed = Math.max(0, state.finance.cash);
+  state.finance.cash = state.finance.allowCashNegative ? state.finance.cash : 0;
+
+  if(cashOnly){
+    // 현금필수인데 부족
+    unpaid = shortage;
+    markArrears(category);
+    logLine(`⚠️ 현금필수 미납 발생 [${memo||category}] 미납 ${money(unpaid)}`);
+    // 현금 마이너스 허용이더라도 "미납"으로 처리 (현실 반영)
+    return {paid:amount-unpaid, cashUsed, cardUsed, unpaid};
+  }
+
+  // 카드로 메꾸기
+  let remain = chargeToCard(shortage);
+  cardUsed = shortage - remain;
+  unpaid = remain;
+
+  if(unpaid>0){
+    logLine(`❌ 카드 한도 부족 [${memo||category}] 미납 ${money(unpaid)}`);
+  }
+
+  // 현금 마이너스 허용이면 “현금”은 그냥 0으로 두는 게 안정적(이중카운트 방지)
+  if(state.finance.cash < 0) state.finance.cash = 0;
+
+  return {paid:amount-unpaid, cashUsed, cardUsed, unpaid};
+}
+
+/** =========================
+ *  7) 카드 월말 정산
+ *  ========================= */
+function settleCardsEndOfMonth(){
+  let interestTotal = 0;
+  let lateCount = 0;
+
+  for(const card of state.finance.cards){
+    if(!card.active) continue;
+    if(card.used<=0) continue;
+
+    const minPay = card.used * card.minPayRate;
+
+    // 최소결제는 현금으로 처리(현실)
+    if(state.finance.cash >= minPay){
+      state.finance.cash -= minPay;
+      card.used -= minPay;
+    }else{
+      // 연체
+      lateCount++;
+      state.finance.creditScore -= 15;
+      card.used += card.lateFeeFlat;
+      logLine(`💳 연체 발생: ${card.name} (현금 부족)`);
+    }
+
+    // 이자
+    const interest = card.used * card.interestRateMonthly;
+    card.used += interest;
+    interestTotal += interest;
+
+    // 사용률 과다 페널티
+    const util = card.used / Math.max(1, card.limit);
+    if(util > card.utilizationHardWarn){
+      state.finance.creditScore -= 5;
+    }else if(util > card.utilizationSoftWarn){
+      state.finance.creditScore -= 2;
+    }
+  }
+
+  state.finance.creditScore = clamp(state.finance.creditScore, state.finance.creditScoreMin, state.finance.creditScoreMax);
+  return {interestTotal, lateCount};
+}
+
+/** =========================
+ *  8) “하루 주문 생성” (현실형)
+ *  ========================= */
+function effectiveCapacityOrdersPerDay(){
+  const cap = state.store.capacity;
+  const baseDaily = cap.baseOrdersPerHour * 10; // 영업 10시간 가정(간단화)
+  let dailyCap = baseDaily * 1.0;
+
+  // 직원 활성 수에 따른 생산성 보정
+  const emp = countActiveEmployees();
+  dailyCap *= (1 + emp*0.25); // 직원 1명당 +25%
+
+  // 피로도에 따른 감쇠
+  const f = Math.max(state.store.fatigue.ownerFatigue, state.store.fatigue.employeeFatigue);
+  let mult = 1.0;
+  if(f>=85) mult *= state.store.fatigue.effects.over85.capacityMultiplier;
+  else if(f>=70) mult *= state.store.fatigue.effects.over70.capacityMultiplier;
+
+  dailyCap *= mult;
+
+  // 하드캡
+  dailyCap = Math.min(dailyCap, cap.maxOrdersPerDayHardCap);
+  return Math.max(10, Math.floor(dailyCap));
+}
+
+function demandOrdersForDay(){
+  // 기본 수요: 노출/리뷰/쿠폰/마케팅/배달비 영향을 합성
+  const qual = state.store.quality;
+  const pf = state.channels.platform;
+  const ph = state.channels.phone;
+
+  let base = 38; // 기본
+  // 노출/리뷰
+  base *= qual.exposure;
+  base *= (0.85 + (qual.reviewScore/5.0)*0.3); // 0.85~1.15
+
+  // 쿠폰은 플랫폼 노출에 가중
+  base *= pf.menuVisibilityBoostFromCoupon;
+
+  // 전화 마케팅이 “전화 비중 + 총 수요 약간”에 영향
+  if(ph.marketingOn) base *= (1 + 0.06);
+
+  // 전화 배달비가 낮으면 전환 및 수요 약간+
+  if(ph.deliveryFeeChargedToCustomer <= ph.lowDeliveryFeeThreshold) base *= (1 + 0.03);
+
+  // 랜덤 변동
+  const noise = 0.85 + Math.random()*0.35; // 0.85~1.20
+  base *= noise;
+
+  // 이벤트(랜덤)
+  let eventNote = "";
+  if(state.events.random.enabled && Math.random() < state.events.random.dailyChance){
+    const types = state.events.random.types;
+    const e = types[Math.floor(Math.random()*types.length)];
+    if(e.type==="big_order_spike"){ base *= 1.35; eventNote="📈 주문 폭증 이벤트"; }
+    if(e.type==="rider_shortage"){ base *= 0.92; eventNote="🛵 기사 부족(전환↓)"; }
+    if(e.type==="ingredient_shortage"){ base *= 0.95; eventNote="🥬 재료 부족(판매↓)"; }
+  }
+
+  return { orders: Math.max(0, Math.floor(base)), eventNote };
+}
+
+/** =========================
+ *  9) 하루 시뮬레이션
+ *  ========================= */
+function simulateDay(){
+  if(GAME_OVER) return;
+
+  const dayNo = state.time.totalDays + 1;
+
+  // (A) 일일 마케팅비
+  if(state.channels.phone.marketingOn){
+    pay(state.channels.phone.marketingDailyCost, "marketing", "전화 마케팅비");
+  }
+
+  // (B) 수요 + 생산 가능량
+  const dem = demandOrdersForDay();
+  const cap = effectiveCapacityOrdersPerDay();
+  let orders = Math.min(dem.orders, cap);
+
+  // (C) 채널 믹스 + 마케팅/배달비로 전화 비중 약간 가중
+  let mixP = state.channels.mixPercent.platform/100;
+  let mixH = state.channels.mixPercent.phone/100;
+  let mixS = state.channels.mixPercent.storeDelivery/100;
+
+  // 전화 마케팅/저배달비는 전화 비중 상승, 플랫폼에서 감소
+  let boost = 0;
+  if(state.channels.phone.marketingOn) boost += state.channels.phone.conversionBoostWhenMarketingOn;
+  if(state.channels.phone.deliveryFeeChargedToCustomer <= state.channels.phone.lowDeliveryFeeThreshold) boost += state.channels.phone.conversionBoostWhenLowDeliveryFee;
+  // boost는 "퍼센트포인트"로 적용(최대 20%p로 제한)
+  boost = clamp(boost, 0, 0.20);
+  mixH = clamp(mixH + boost, 0, 0.85);
+  const cut = boost; // 플랫폼에서 우선 차감
+  mixP = clamp(mixP - cut, 0, 0.95);
+  // 합이 1이 아니면 정규화
+  const sum = mixP+mixH+mixS || 1;
+  mixP/=sum; mixH/=sum; mixS/=sum;
+
+  let platformOrders = Math.round(orders*mixP);
+  let phoneOrders = Math.round(orders*mixH);
+  let storeOrders = Math.max(0, orders - platformOrders - phoneOrders);
+
+  // (D) 병목/취소(직접배달 비중이 높고 주문 많으면 상승)
+  const selfShare = state.channels.storeDelivery.self.enabled ? state.channels.storeDelivery.self.shareOfStoreDelivery : 0;
+  const emp = countActiveEmployees();
+  const fatigue = Math.max(state.store.fatigue.ownerFatigue, state.store.fatigue.employeeFatigue);
+
+  let bottleneckProb = 0.03;
+  bottleneckProb += (orders>45?0.05:0);
+  bottleneckProb += (selfShare>0.6?0.05:0);
+  bottleneckProb += (fatigue>70?0.06:0);
+  bottleneckProb -= emp*0.02; // 직원은 병목 감소
+  bottleneckProb = clamp(bottleneckProb, 0, 0.35);
+
+  let cancelled = 0;
+  if(Math.random() < bottleneckProb){
+    cancelled = Math.floor(orders*(0.08 + Math.random()*0.10)); // 8~18% 취소
+    // 취소는 주로 가게배달/전화에서 발생한다고 가정
+    const cancelFromStore = Math.min(storeOrders, Math.round(cancelled*0.55));
+    const cancelFromPhone = Math.min(phoneOrders, cancelled - cancelFromStore);
+    storeOrders -= cancelFromStore;
+    phoneOrders -= cancelFromPhone;
+    cancelled = cancelFromStore + cancelFromPhone;
+  }
+
+  // (E) 메뉴/원가 계산(현재는 콤비 1개만)
+  const item = state.menu.items[0];
+  let price = item.basePrice;
+  if(item.size==="large") price = Math.min(price, state.pricing.maxPrice.large);
+  const coupon = state.pricing.couponDefault; // locked 가정
+  const reviewUp = state.pricing.reviewEvent.enabled ? state.pricing.reviewEvent.extraCharge : 0;
+  const reviewCost = state.pricing.reviewEvent.enabled ? state.pricing.reviewEvent.costPerOrder : 0;
+
+  // 대량사입 원가 절감(현실: 강제품목 한계 → 소폭만)
+  let foodCost = item.foodCost;
+  if(state.inventory.bulkPurchase.enabled){
+    const dr = state.inventory.bulkPurchase.discountRate;
+    // 강제품목 비중만큼은 할인 적용 제한
+    const reducible = 1 - item.forcedIngredientsShare;
+    const eff = dr * reducible; // 실효 할인
+    foodCost = foodCost * (1 - eff);
+    // 보관 페널티(폐기/숨은비용)
+    foodCost = foodCost * (1 + state.inventory.bulkPurchase.storagePenaltyRate);
+  }
+  const packCost = item.packagingCost;
+
+  // (F) 폐기/클레임/환불
+  const wasteOrders = Math.round(orders * item.wasteRate);
+  const baseComplaintRate = item.complaintRate;
+  let complaintMult = 1.0;
+  if(fatigue>=85) complaintMult *= state.store.fatigue.effects.over85.complaintMultiplier;
+  else if(fatigue>=70) complaintMult *= state.store.fatigue.effects.over70.complaintMultiplier;
+
+  const complaints = Math.max(0, Math.round(orders * baseComplaintRate * complaintMult));
+  const refunds = Math.round(complaints * item.refundRateIfComplaint);
+
+  // (G) 매출/비용 (채널별)
+  // 매출: (판매가-쿠폰) + 리뷰추가금 + (전화 배달비는 고객부담 매출로 가정)
+  const netSalesPerOrder = (price - coupon) + reviewUp;
+  const phoneDeliveryFee = state.channels.phone.deliveryFeeChargedToCustomer;
+
+  const grossSales =
+    platformOrders * netSalesPerOrder +
+    storeOrders * netSalesPerOrder +
+    phoneOrders * (netSalesPerOrder + phoneDeliveryFee);
+
+  // 변동비: 원가(음식+포장)+리뷰비용 + (플랫폼수수료/결제수수료) + 배달비
+  // 원가는 취소 제외된 orders 기준
+  const actualOrders = platformOrders + phoneOrders + storeOrders;
+
+  // 원가 결제(카드 가능)
+  const cogs = actualOrders * (foodCost + packCost) + actualOrders * reviewCost;
+  pay(cogs, "ingredients", "식자재/포장/리뷰비");
+
+  // 플랫폼 수수료
+  const pf = state.channels.platform;
+  const platformGMV = platformOrders * (price - coupon + reviewUp); // 간단 GMV
+  const platformFee = platformGMV * pf.feeRate + platformGMV * pf.paymentFeeRate + platformOrders * pf.fixedPerOrderFee;
+  pay(platformFee, "platform_fee", "플랫폼 수수료");
+
+  // 가게배달(대행 vs 직접)
+  const selfOrders = Math.round(storeOrders * selfShare);
+  const agencyOrders = storeOrders - selfOrders;
+
+  const agencyCost = agencyOrders * state.channels.storeDelivery.agency.costPerOrder;
+  pay(agencyCost, "delivery_agency", "배달대행비");
+
+  const selfVarCost = selfOrders * state.channels.storeDelivery.self.variableCostPerOrder;
+  pay(selfVarCost, "bike_variable", "직접배달 유류/소모");
+
+  // 환불 손실(매출 차감처럼 처리) + 클레임 비용(원가 추가 발생 느낌은 여기선 생략)
+  const refundLoss = refunds * netSalesPerOrder; // 단순
+
+  // (H) 현금 흐름: 매출 유입(현금/카드매출 분리는 복잡하니 현금 유입으로 단순화)
+  state.finance.cash += (grossSales - refundLoss);
+
+  // (I) 피로도/품질 업데이트
+  const peakExtra = (orders>45 ? state.store.fatigue.fatigueIncrease.peakHourExtra*orders : 0);
+  state.store.fatigue.ownerFatigue = clamp(
+    state.store.fatigue.ownerFatigue + actualOrders*state.store.fatigue.fatigueIncrease.perOrderMade + selfOrders*state.store.fatigue.fatigueIncrease.perSelfDelivery + peakExtra - state.store.fatigue.fatigueRecoveryPerDay,
+    0, state.store.fatigue.fatigueMax
+  );
+  state.store.fatigue.employeeFatigue = clamp(
+    state.store.fatigue.employeeFatigue + actualOrders*0.25 - state.store.fatigue.fatigueRecoveryPerDay,
+    0, state.store.fatigue.fatigueMax
+  );
+
+  // 리뷰는 클레임/환불/취소가 있으면 하락, 없으면 소폭 상승
+  let reviewDelta = 0.00;
+  reviewDelta -= complaints*0.01;
+  reviewDelta -= cancelled*0.005;
+  reviewDelta += Math.min(0.03, actualOrders*0.0003);
+  state.store.quality.reviewScore = clamp(state.store.quality.reviewScore + reviewDelta, state.store.quality.reviewScoreMin, state.store.quality.reviewScoreMax);
+
+  // 노출은 리뷰와 쿠폰 영향, 본사/이벤트로도 변함(여기선 리뷰 기반)
+  const targetExposure = clamp(0.7 + (state.store.quality.reviewScore/5.0)*0.7, state.store.quality.exposureMin, state.store.quality.exposureMax);
+  // 천천히 따라가게
+  state.store.quality.exposure = clamp(state.store.quality.exposure*0.85 + targetExposure*0.15, state.store.quality.exposureMin, state.store.quality.exposureMax);
+
+  // (J) KPI 저장
+  // 비용 합산은 “오늘 결제된 비용”을 정확히 추적하려면 분개가 필요. v1에서는 추정치로 기록:
+  const estCosts = cogs + platformFee + agencyCost + selfVarCost + refundLoss;
+  const profit = grossSales - estCosts;
+
+  state.kpis.daily.push({
+    dayGlobal: dayNo,
+    month: state.time.month,
+    dayInMonth: state.time.day,
+    ordersDemand: dem.orders,
+    ordersCap: cap,
+    orders: actualOrders,
+    cancelled,
+    platformOrders, phoneOrders, storeOrders,
+    selfOrders, agencyOrders,
+    sales: grossSales,
+    costs: estCosts,
+    profit,
+    review: state.store.quality.reviewScore,
+    exposure: state.store.quality.exposure,
+    note: dem.eventNote || (cancelled>0 ? "병목 취소 발생" : "")
+  });
+  if(state.kpis.daily.length>400) state.kpis.daily.shift();
+
+  // (K) 일 마감 로그/요약
+  const sum = [
+    `DAY ${state.time.day}/${state.meta.daysPerMonth} (월 ${state.time.month})`,
+    dem.eventNote ? `이벤트: ${dem.eventNote}` : "",
+    `수요 ${dem.orders}건 / 처리가능 ${cap}건 → 실제 ${actualOrders}건 (취소 ${cancelled})`,
+    `채널: 플랫폼 ${platformOrders} · 전화 ${phoneOrders} · 가게배달 ${storeOrders} (직접 ${selfOrders} / 대행 ${agencyOrders})`,
+    `매출 ${money(grossSales)} / 비용(추정) ${money(estCosts)} / 손익 ${money(profit)}`,
+    `리뷰 ${state.store.quality.reviewScore.toFixed(2)} · 노출 ${state.store.quality.exposure.toFixed(2)}`,
+    `피로도(사장) ${Math.round(state.store.fatigue.ownerFatigue)}`
+  ].filter(Boolean).join("\n");
+
+  $("todaySummary").innerHTML =
+    `<span class="${profit>=0?"good":"bad"}">오늘 손익: ${money(profit)}</span> · ` +
+    `주문 ${actualOrders} · 취소 ${cancelled} · 리뷰 ${state.store.quality.reviewScore.toFixed(2)} · 노출 ${state.store.quality.exposure.toFixed(2)}`;
+
+  logLine(sum);
+
+  // (L) 시간 이동
+  state.time.totalDays += 1;
+  state.time.day += 1;
+
+  // 월말이면 closeMonth
+  if(state.time.day > state.meta.daysPerMonth){
+    closeMonth();
+  }
+
+  // 게임오버 체크
+  checkGameOver();
+
+  refreshHUD();
+  refreshTables();
+  refreshJsonBox();
+}
+
+function closeMonth(){
+  // 월 고정비/급여/4대보험/오토바이 고정비/부가세/본사이벤트/카드정산
+  const m = state.time.month;
+
+  // (1) 고정비
+  const fc = state.fixedCostsMonthly;
+  // 임대료(현금필수)
+  const rentRes = pay(fc.rent, "rent", "임대료");
+  // 급여(현금필수): 활성 직원 합 + 사장급여(옵션)
+  const salary = state.store.staff.employees.filter(e=>e.active).reduce((a,e)=>a+e.salaryMonthly,0)
+    + state.store.staff.owners.filter(o=>o.active).reduce((a,o)=>a+(o.salaryMonthly||0),0);
+
+  const salRes = pay(salary, "salary", "급여");
+
+  // 4대보험(현금필수): 직원 급여에 비례
+  const four = salary * state.store.staff.fourInsuranceRate;
+  const fourRes = pay(four, "four_insurance", "4대보험");
+
+  // 나머지 고정비(카드 가능)
+  const otherFixed = fc.maintenance + fc.utilities + fc.internetPhone + fc.pos + fc.accounting + fc.insurance + fc.royalty + fc.franchiseAds + fc.platformAds;
+  pay(otherFixed, "utilities_optional", "기타 고정비");
+
+  // 오토바이 고정비(카드 가능) - 직접배달 활성일 때만(현실 반영)
+  const bikeFixed = state.channels.storeDelivery.self.bikeFixedMonthly;
+  pay(bikeFixed, "bike_fixed", "오토바이 고정비");
+
+  // (2) 부가세(분기)
+  let taxPaid = 0;
+  if(state.tax.vat.enabled){
+    state.tax.vat.nextDueInMonths -= 1;
+    if(state.tax.vat.nextDueInMonths <= 0){
+      // 과세표준을 “이번 분기 매출 합”으로 단순 계산
+      const startMonth = Math.max(1, m - state.meta.vatCycleMonths + 1);
+      const qSales = state.kpis.daily
+        .filter(d=>d.month>=startMonth && d.month<=m)
+        .reduce((a,d)=>a+d.sales,0);
+      const vat = qSales * state.tax.vat.rate;
+      const vatRes = pay(vat, "tax_vat", "부가세");
+      taxPaid = vat - vatRes.unpaid;
+
+      if(vatRes.unpaid>0){
+        state.finance.creditScore -= state.tax.vat.lateCreditScorePenalty;
+        // 연체 페널티: 카드 이자/한도 악화 느낌(여기선 신용도만)
+        logLine(`💣 부가세 미납 패널티: 신용도 -${state.tax.vat.lateCreditScorePenalty}`);
+      }
+      state.tax.vat.nextDueInMonths = state.tax.vat.cycleMonths;
+      logLine(`🧾 부가세 결제(분기): ${money(vat)}`);
+    }
+  }
+
+  // (3) 본사 압박 이벤트
+  let hqNote = "";
+  if(state.events.hqPressure.enabled && Math.random() < state.events.hqPressure.monthlyChance){
+    const types = state.events.hqPressure.types;
+    const e = types[Math.floor(Math.random()*types.length)];
+    if(e.type==="force_coupon"){
+      // 쿠폰 강제는 이미 locked. 대신 광고 요구/노출 변화로 구현
+      state.fixedCostsMonthly.platformAds += 100000 * e.severity;
+      hqNote = `🏢 본사: 광고비 증액 요구 +${money(100000*e.severity)}`;
+    }
+    if(e.type==="force_item_purchase"){
+      // 강제 사입(카드 가능)
+      const buy = 300000 * e.severity;
+      pay(buy, "ingredients", "본사 강제 사입");
+      // 재고 부담으로 폐기율 상승(간단)
+      state.menu.items[0].wasteRate = clamp(state.menu.items[0].wasteRate + 0.003*e.severity, 0.01, 0.08);
+      hqNote = `🏢 본사: 강제 사입 ${money(buy)} (폐기율↑)`;
+    }
+    if(e.type==="raise_franchise_ads"){
+      state.fixedCostsMonthly.franchiseAds += 80000 * e.severity;
+      hqNote = `🏢 본사: 광고분담금 증액 +${money(80000*e.severity)}`;
+    }
+  }
+  if(hqNote) logLine(hqNote);
+
+  // (4) 카드 정산
+  const settle = settleCardsEndOfMonth();
+
+  // (5) 현금필수 미납 유예 처리
+  // 유예일은 “월말에도 미납이면 누적”이므로 월말에 경고 강화
+  // (아래 checkGameOver에서 graceDays 넘어가면 종료)
+
+  // (6) 월 KPI 집계
+  const days = state.kpis.daily.filter(d=>d.month===m);
+  const monthOrders = days.reduce((a,d)=>a+d.orders,0);
+  const monthSales = days.reduce((a,d)=>a+d.sales,0);
+  const monthCosts = days.reduce((a,d)=>a+d.costs,0);
+  const monthProfit = monthSales - monthCosts
+    - (state.fixedCostsMonthly.maintenance + state.fixedCostsMonthly.utilities + state.fixedCostsMonthly.internetPhone + state.fixedCostsMonthly.pos + state.fixedCostsMonthly.accounting + state.fixedCostsMonthly.insurance + state.fixedCostsMonthly.royalty + state.fixedCostsMonthly.franchiseAds + state.fixedCostsMonthly.platformAds)
+    - bikeFixed
+    - salary
+    - four
+    - fc.rent
+    - taxPaid;
+
+  state.kpis.monthly.push({
+    month: m,
+    orders: monthOrders,
+    sales: monthSales,
+    variableCosts: monthCosts,
+    fixedCosts: (fc.rent + salary + four + otherFixed + bikeFixed),
+    taxPaid,
+    interest: settle.interestTotal,
+    profit: monthProfit,
+    cash: state.finance.cash,
+    cardUsed: state.finance.cards.reduce((a,c)=>a+c.used,0)
+  });
+
+  logLine(`📦 월말정산(월 ${m}) | 주문 ${monthOrders} | 매출 ${money(monthSales)} | 월손익(추정) ${money(monthProfit)} | 이자 ${money(settle.interestTotal)}`);
+
+  // (7) 다음 달
+  state.time.month += 1;
+  state.time.day = 1;
+}
+
+/** =========================
+ *  10) 게임오버 체크
+ *  ========================= */
+function checkGameOver(){
+  if(GAME_OVER) return;
+
+  // 카드 한도 전부 초과
+  if(state.gameRules.gameOver.ifAllCardsOverLimit && allCardsOverLimit()){
+    GAME_OVER = true;
+    logLine("🟥 GAME OVER: 카드 한도 초과");
+  }
+
+  // 신용도 바닥
+  if(state.gameRules.gameOver.ifCreditScoreBelowMin && state.finance.creditScore <= state.finance.creditScoreMin){
+    GAME_OVER = true;
+    logLine("🟥 GAME OVER: 신용도 붕괴");
+  }
+
+  // 현금필수 미납 유예 초과
+  const grace = state.finance.paymentRules.ifCashOnlyUnpaid.graceDays;
+  const a = state.finance.arrears;
+  const maxAr = Math.max(a.rentDays, a.salaryDays, a.taxDays);
+  if(state.gameRules.gameOver.ifCashOnlyUnpaidBeyondGrace && maxAr > grace){
+    GAME_OVER = true;
+    logLine("🟥 GAME OVER: 현금필수(임대/급여/세금) 미납 유예 초과");
+  }
+
+  // 버튼 잠금
+  if(GAME_OVER){
+    ["btnNextDay","btnNext7","btnFinishMonth","btnHire","btnFire","btnMk","btnBulk"].forEach(id=>$(id).disabled=true);
+    $("todaySummary").innerHTML = `<span class="bad"><b>GAME OVER</b></span> · 로그를 확인하고 설정을 조정한 뒤 초기화하세요.`;
+  }
+}
+
+/** =========================
+ *  11) HUD/테이블/JSON 갱신
+ *  ========================= */
+function refreshHUD(){
+  $("hudMonth").textContent = state.time.month;
+  $("hudDay").textContent = state.time.day;
+  $("hudDPM").textContent = state.meta.daysPerMonth;
+
+  $("kpiCash").innerHTML = `<span class="${state.finance.cash>=0?"good":"warn"}">${money(state.finance.cash)}</span>`;
+  const cardUsed = state.finance.cards.reduce((a,c)=>a+c.used,0);
+  const cardLimit = state.finance.cards.reduce((a,c)=>a+c.limit,0);
+  const util = cardLimit>0 ? cardUsed/cardLimit : 0;
+  const utilCls = util>0.9?"bad":util>0.8?"warn":"good";
+  $("kpiCardUsed").innerHTML = `<span class="${utilCls}">${money(cardUsed)}</span> / ${money(cardLimit)}`;
+
+  const creditCls = state.finance.creditScore>=90?"good":state.finance.creditScore>=70?"warn":"bad";
+  $("kpiCredit").innerHTML = `<span class="${creditCls}">${state.finance.creditScore}</span>`;
+
+  $("kpiQual").innerHTML = `리뷰 <b>${state.store.quality.reviewScore.toFixed(2)}</b> · 노출 <b>${state.store.quality.exposure.toFixed(2)}</b>`;
+
+  $("lblMk").textContent = state.channels.phone.marketingOn ? "ON" : "OFF";
+  $("lblBulk").textContent = state.inventory.bulkPurchase.enabled ? "ON" : "OFF";
+  $("lblSelfShare").textContent = Math.round(state.channels.storeDelivery.self.shareOfStoreDelivery*100) + "%";
+  $("rngSelfShare").value = Math.round(state.channels.storeDelivery.self.shareOfStoreDelivery*100);
+
+  // mix slider reflect
+  $("mixPlatform").value = state.channels.mixPercent.platform;
+  $("mixPhone").value = state.channels.mixPercent.phone;
+  $("mixStore").value = state.channels.mixPercent.storeDelivery;
+  syncMixLabels();
+
+  refreshEmpLabel();
+}
+
+function refreshTables(){
+  // monthly
+  const mbody = $("tblMonthly");
+  mbody.innerHTML = "";
+  for(const r of state.kpis.monthly.slice(-24)){
+    const tr=document.createElement("tr");
+    const cls = r.profit>=0?"good":"bad";
+    tr.innerHTML = `
+      <td>${r.month}</td>
+      <td style="text-align:right">${r.orders.toLocaleString("ko-KR")}</td>
+      <td>${money(r.sales)}</td>
+      <td>${money(r.variableCosts)}</td>
+      <td>${money(r.fixedCosts)}</td>
+      <td>${money(r.taxPaid)}</td>
+      <td>${money(r.interest)}</td>
+      <td class="${cls}">${money(r.profit)}</td>
+      <td>${money(r.cash)}</td>
+      <td>${money(r.cardUsed)}</td>
+    `;
+    mbody.appendChild(tr);
+  }
+
+  // daily recent 10
+  const dbody = $("tblDaily");
+  dbody.innerHTML="";
+  const rows = state.kpis.daily.slice(-10);
+  for(const d of rows){
+    const tr=document.createElement("tr");
+    const cls = d.profit>=0?"good":"bad";
+    tr.innerHTML = `
+      <td>M${d.month}-D${d.dayInMonth}</td>
+      <td style="text-align:right">${d.orders}</td>
+      <td style="text-align:right">${d.cancelled}</td>
+      <td>${money(d.sales)}</td>
+      <td>${money(d.costs)}</td>
+      <td class="${cls}">${money(d.profit)}</td>
+      <td>${d.review.toFixed(2)}</td>
+      <td>${d.exposure.toFixed(2)}</td>
+    `;
+    dbody.appendChild(tr);
+  }
+}
+
+function refreshJsonBox(){
+  if($("tabJson").style.display==="none") return;
+  $("jsonBox").value = JSON.stringify(state, null, 2);
+}
+
+function refreshSettingsForm(){
+  const item = state.menu.items[0];
+  $("s_price").value = item.basePrice;
+  $("s_coupon").value = state.pricing.couponDefault;
+  $("s_reviewUp").value = state.pricing.reviewEvent.extraCharge;
+  $("s_reviewCost").value = state.pricing.reviewEvent.costPerOrder;
+  $("s_foodCost").value = item.foodCost;
+  $("s_packCost").value = item.packagingCost;
+
+  $("s_pf_fee").value = state.channels.platform.feeRate;
+  $("s_pf_payfee").value = state.channels.platform.paymentFeeRate;
+
+  $("s_agency").value = state.channels.storeDelivery.agency.costPerOrder;
+  $("s_selfVar").value = state.channels.storeDelivery.self.variableCostPerOrder;
+  $("s_bikeFixed").value = state.channels.storeDelivery.self.bikeFixedMonthly;
+  $("s_phoneFee").value = state.channels.phone.deliveryFeeChargedToCustomer;
+
+  $("s_rent").value = state.fixedCostsMonthly.rent;
+  $("s_salary").value = state.store.staff.employees.find(e=>e.active)?.salaryMonthly || 2800000;
+  $("s_maint").value = state.fixedCostsMonthly.maintenance;
+  $("s_util").value = state.fixedCostsMonthly.utilities;
+  $("s_royalty").value = state.fixedCostsMonthly.royalty;
+  $("s_ads").value = state.fixedCostsMonthly.platformAds + state.fixedCostsMonthly.franchiseAds;
+
+  const main = getCardById("card_main");
+  $("s_cardLimit").value = main.limit;
+  $("s_cardInt").value = main.interestRateMonthly;
+}
+
+/** =========================
+ *  12) 버튼: 진행/자동
+ *  ========================= */
+$("btnNextDay").addEventListener("click", simulateDay);
+$("btnNext7").addEventListener("click", ()=>{
+  if(GAME_OVER) return;
+  for(let i=0;i<7;i++){ if(GAME_OVER) break; simulateDay(); }
+});
+$("btnFinishMonth").addEventListener("click", ()=>{
+  if(GAME_OVER) return;
+  const target = state.meta.daysPerMonth;
+  while(!GAME_OVER && state.time.day<=target){
+    simulateDay();
+  }
+});
+$("btnReset").addEventListener("click", ()=>{
+  state = deepClone(INITIAL_STATE);
+  GAME_OVER = false;
+  ["btnNextDay","btnNext7","btnFinishMonth","btnHire","btnFire","btnMk","btnBulk"].forEach(id=>$(id).disabled=false);
+  clearLog();
+  $("todaySummary").textContent="-";
+  $("lblMk").textContent="OFF";
+  $("lblBulk").textContent="OFF";
+  refreshHUD();
+  refreshSettingsForm();
+  refreshTables();
+  refreshJsonBox();
+  logLine("🔁 초기화 완료");
+});
+
+/** =========================
+ *  13) 설정 적용/프리셋
+ *  ========================= */
+$("btnApplySettings").addEventListener("click", ()=>{
+  const item = state.menu.items[0];
+  item.basePrice = +$("s_price").value;
+  state.pricing.couponDefault = +$("s_coupon").value;
+  state.pricing.reviewEvent.extraCharge = +$("s_reviewUp").value;
+  state.pricing.reviewEvent.costPerOrder = +$("s_reviewCost").value;
+  item.foodCost = +$("s_foodCost").value;
+  item.packagingCost = +$("s_packCost").value;
+
+  state.channels.platform.feeRate = +$("s_pf_fee").value;
+  state.channels.platform.paymentFeeRate = +$("s_pf_payfee").value;
+
+  state.channels.storeDelivery.agency.costPerOrder = +$("s_agency").value;
+  state.channels.storeDelivery.self.variableCostPerOrder = +$("s_selfVar").value;
+  state.channels.storeDelivery.self.bikeFixedMonthly = +$("s_bikeFixed").value;
+  state.channels.phone.deliveryFeeChargedToCustomer = +$("s_phoneFee").value;
+
+  state.fixedCostsMonthly.rent = +$("s_rent").value;
+  // 직원 급여는 "활성 직원"이 있으면 그 직원에 적용, 없으면 첫 슬롯에 값만 반영
+  const any = state.store.staff.employees.find(e=>e.active) || state.store.staff.employees[0];
+  if(any) any.salaryMonthly = +$("s_salary").value;
+
+  state.fixedCostsMonthly.maintenance = +$("s_maint").value;
+  state.fixedCostsMonthly.utilities = +$("s_util").value;
+  state.fixedCostsMonthly.royalty = +$("s_royalty").value;
+
+  // 광고비는 franchiseAds + platformAds로 나눠 반영(반반)
+  const ads = +$("s_ads").value;
+  state.fixedCostsMonthly.franchiseAds = Math.round(ads*0.5);
+  state.fixedCostsMonthly.platformAds = ads - state.fixedCostsMonthly.franchiseAds;
+
+  const main = getCardById("card_main");
+  main.limit = +$("s_cardLimit").value;
+  main.interestRateMonthly = +$("s_cardInt").value;
+
+  logLine("✅ 설정 적용 완료");
+  refreshHUD();
+  refreshJsonBox();
+});
+
+$("btnPresetUser").addEventListener("click", ()=>{
+  // 네 대화 기준값에 맞춘 프리셋(콤비, 쿠폰 1만원, 원가 5600, 플랫폼 수수료는 기본 유지)
+  const item = state.menu.items[0];
+  item.basePrice = 27900;
+  state.pricing.couponDefault = 10000;
+  item.foodCost = 5600;
+  item.packagingCost = 600;
+  state.pricing.reviewEvent.enabled = true;
+  state.pricing.reviewEvent.extraCharge = 700;
+  state.pricing.reviewEvent.costPerOrder = 400;
+
+  // 믹스 기본 60/20/20
+  state.channels.mixPercent.platform = 60;
+  state.channels.mixPercent.phone = 20;
+  state.channels.mixPercent.storeDelivery = 20;
+
+  // 대행/직배 비용
+  state.channels.storeDelivery.agency.costPerOrder = 3200;
+  state.channels.storeDelivery.self.variableCostPerOrder = 700;
+  state.channels.storeDelivery.self.bikeFixedMonthly = 250000;
+  state.channels.phone.deliveryFeeChargedToCustomer = 500;
+
+  refreshSettingsForm();
+  refreshHUD();
+  logLine("🎛 네 기준 프리셋 적용");
+});
+
+/** =========================
+ *  14) JSON 적용/내보내기
+ *  ========================= */
+$("btnLoadJson").addEventListener("click", ()=>{
+  try{
+    const obj = JSON.parse($("jsonBox").value);
+    state = obj;
+    GAME_OVER = false;
+    ["btnNextDay","btnNext7","btnFinishMonth","btnHire","btnFire","btnMk","btnBulk"].forEach(id=>$(id).disabled=false);
+    $("jsonMsg").textContent = "✅ JSON 적용 완료";
+    clearLog();
+    logLine("✅ JSON으로 STATE 로드");
+    refreshHUD();
+    refreshSettingsForm();
+    refreshTables();
+    refreshJsonBox();
+  }catch(e){
+    $("jsonMsg").textContent = "❌ JSON 파싱 실패: " + e.message;
+  }
+});
+$("btnExportJson").addEventListener("click", async ()=>{
+  try{
+    await navigator.clipboard.writeText(JSON.stringify(state,null,2));
+    $("jsonMsg").textContent="✅ 클립보드로 복사 완료";
+  }catch(e){
+    $("jsonMsg").textContent="⚠️ 클립보드 복사 실패(브라우저 권한). 텍스트를 직접 복사하세요.";
+  }
+});
+$("btnRefreshJson").addEventListener("click", ()=>{
+  $("jsonBox").value = JSON.stringify(state,null,2);
+  $("jsonMsg").textContent="↻ 현재 STATE로 갱신";
+});
+
+/** =========================
+ *  15) 초기 렌더
+ *  ========================= */
+function init(){
+  // UI 초기
+  $("hudDiff").textContent = "REAL";
+  $("lblMk").textContent = state.channels.phone.marketingOn ? "ON":"OFF";
+  $("lblBulk").textContent = state.inventory.bulkPurchase.enabled ? "ON":"OFF";
+  refreshEmpLabel();
+
+  // 믹스
+  $("mixPlatform").value = state.channels.mixPercent.platform;
+  $("mixPhone").value = state.channels.mixPercent.phone;
+  $("mixStore").value = state.channels.mixPercent.storeDelivery;
+  syncMixLabels();
+
+  // self share
+  $("rngSelfShare").value = Math.round(state.channels.storeDelivery.self.shareOfStoreDelivery*100);
+  $("lblSelfShare").textContent = Math.round(state.channels.storeDelivery.self.shareOfStoreDelivery*100)+"%";
+
+  refreshHUD();
+  refreshSettingsForm();
+  refreshTables();
+  $("todaySummary").textContent = "-";
+  clearLog();
+  logLine("✅ 시뮬레이터 시작");
+  logLine("팁) ‘설정(현실값)’에서 임대료/급여/수수료를 맞춘 뒤 돌리면 체감이 정확해짐.");
+}
+init();
+</script>
+</body>
+</html>
