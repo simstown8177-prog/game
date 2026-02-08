@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>피자집 현실 운영 시뮬레이터 (풀버전 · 단일파일)</title>
+<title>피자집 현실 운영 시뮬레이터 (게임 모드)</title>
 <style>
   :root{
     --bg:#0b0f14; --card:#121824; --card2:#0f1520; --line:#1f2a3a;
@@ -48,11 +48,23 @@
   .good{color:var(--good)}
   .warn{color:var(--warn)}
   .bad{color:var(--bad)}
+  .hero{background:linear-gradient(120deg,#1a2a5a,#0b1220);border:1px solid #263760;padding:14px;border-radius:14px}
+  .hero h2{margin:0 0 6px;font-size:16px}
+  .progress{background:#0d1524;border:1px solid var(--line);border-radius:999px;height:12px;overflow:hidden}
+  .progress > span{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#2563eb)}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+  .badge{display:inline-flex;align-items:center;gap:6px;border:1px solid #2a3a55;border-radius:999px;padding:4px 10px;background:#0d1524;font-size:12px;color:var(--muted)}
+  .quest{border:1px dashed #334155;border-radius:12px;padding:10px;background:#0c1322}
+  .action-card{border:1px solid #263b5f;border-radius:12px;padding:10px;background:#0e1728}
+  .action-card h4{margin:0 0 6px;font-size:14px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:11px;border:1px solid #314057;border-radius:999px;padding:2px 8px;color:#b4c6e3}
+  .glow{box-shadow:0 0 0 1px rgba(37,99,235,.6), 0 0 18px rgba(37,99,235,.2)}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🍕 피자집 현실 운영 시뮬레이터 (풀버전 · 단일파일)</h1>
+  <h1>🍕 피자집 현실 운영 시뮬레이터 (게임 모드)</h1>
 
   <div class="grid">
     <!-- LEFT: HUD + CONTROLS -->
@@ -154,14 +166,102 @@
     <!-- RIGHT: TABS -->
     <div class="card">
       <div class="tabs">
-        <div class="tab active" data-tab="tabDash">대시보드</div>
+        <div class="tab active" data-tab="tabGame">게임플레이</div>
+        <div class="tab" data-tab="tabDash">대시보드</div>
         <div class="tab" data-tab="tabSettings">설정(현실값)</div>
         <div class="tab" data-tab="tabJson">STATE JSON</div>
         <div class="tab" data-tab="tabKpi">월/일 KPI</div>
       </div>
 
+      <!-- GAME -->
+      <div id="tabGame">
+        <div class="hero glow">
+          <h2>🎮 현실 모드 캠페인</h2>
+          <div class="small" id="storyLine">서울 외곽 작은 상권에서 시작. 버티면서 성장해 본사 압박을 이겨내세요.</div>
+          <div style="height:10px"></div>
+          <div class="stat-grid">
+            <div>
+              <div class="badge">🏆 레벨 <b id="gameLevel">1</b> · <span id="gameTitle">골목 신입</span></div>
+              <div style="height:8px"></div>
+              <div class="progress"><span id="xpBar" style="width:0%"></span></div>
+              <div class="small" id="xpText" style="margin-top:6px">XP 0 / 100</div>
+            </div>
+            <div>
+              <div class="badge">⚡ 액션 포인트 <b id="apText">2</b></div>
+              <div class="small" style="margin-top:6px">액션은 <b>하루 진행 전</b>에만 적용됩니다.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="row">
+          <div class="col">
+            <div class="quest">
+              <b>📌 오늘의 미션</b>
+              <div class="small" id="questDesc" style="margin-top:6px">-</div>
+              <div class="chips" style="margin-top:8px" id="questRewards"></div>
+              <div class="small" id="questStatus" style="margin-top:8px">-</div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card" style="padding:12px;background:var(--card2)">
+              <b>🏅 업적 트래커</b>
+              <div class="small" id="achievementList" style="margin-top:8px">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+
+        <div class="row">
+          <div class="col">
+            <div class="action-card">
+              <h4>🔥 러시 아워 프로모션</h4>
+              <div class="small">오늘 수요 +10%, 플랫폼 노출 +0.06 (비용: 30,000원)</div>
+              <div class="chips" style="margin-top:6px">
+                <span class="chip">수요 +10%</span>
+                <span class="chip">노출 +0.06</span>
+                <span class="chip bad">현금 -30,000원</span>
+              </div>
+              <div class="btns" style="margin-top:8px">
+                <button id="btnActionRush">액션 사용</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="action-card">
+              <h4>🧪 품질 집중 모드</h4>
+              <div class="small">클레임 -20%, 리뷰 +0.05 (추가 비용: 15,000원)</div>
+              <div class="chips" style="margin-top:6px">
+                <span class="chip">클레임 -20%</span>
+                <span class="chip good">리뷰 +0.05</span>
+                <span class="chip bad">현금 -15,000원</span>
+              </div>
+              <div class="btns" style="margin-top:8px">
+                <button id="btnActionQuality">액션 사용</button>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="action-card">
+              <h4>🤝 동네 제휴 이벤트</h4>
+              <div class="small">전화 주문 비중 +8%p, 리뷰 +0.03 (비용: 10,000원)</div>
+              <div class="chips" style="margin-top:6px">
+                <span class="chip">전화 비중 +8%p</span>
+                <span class="chip good">리뷰 +0.03</span>
+                <span class="chip bad">현금 -10,000원</span>
+              </div>
+              <div class="btns" style="margin-top:8px">
+                <button id="btnActionCommunity">액션 사용</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- DASH -->
-      <div id="tabDash">
+      <div id="tabDash" style="display:none">
         <div class="row">
           <div class="col">
             <div class="card" style="padding:12px;background:var(--card2)">
@@ -349,6 +449,16 @@ function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 const INITIAL_STATE = {
   meta: { version:"pizza-sim-v1", timezone:"Asia/Seoul", daysPerMonth:30, vatCycleMonths:3 },
   time: { month:1, day:1, totalDays:0 },
+  gameplay: {
+    level:1,
+    xp:0,
+    xpToNext:100,
+    actionPointsMax:2,
+    actionPoints:2,
+    dayQuest:null,
+    completedQuests:0,
+    modifiers:{ demand:1.0, complaint:1.0, reviewBonus:0.0, phoneMixBoost:0.0, exposureBonus:0.0 }
+  },
   finance: {
     cash: 500000,
     allowCashNegative: true,
@@ -472,6 +582,7 @@ const INITIAL_STATE = {
 
 let state = deepClone(INITIAL_STATE);
 let GAME_OVER = false;
+let LAST_DAY_RESULT = null;
 
 /** =========================
  *  2) 로그
@@ -491,9 +602,10 @@ document.querySelectorAll(".tab").forEach(t=>{
     document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
     t.classList.add("active");
     const id = t.dataset.tab;
-    ["tabDash","tabSettings","tabJson","tabKpi"].forEach(k=>$(k).style.display = (k===id?"block":"none"));
+    ["tabGame","tabDash","tabSettings","tabJson","tabKpi"].forEach(k=>$(k).style.display = (k===id?"block":"none"));
     refreshTables();
     refreshJsonBox();
+    refreshGameUI();
   });
 });
 
@@ -728,10 +840,11 @@ function demandOrdersForDay(){
   const qual = state.store.quality;
   const pf = state.channels.platform;
   const ph = state.channels.phone;
+  const gm = state.gameplay.modifiers;
 
   let base = 38; // 기본
   // 노출/리뷰
-  base *= qual.exposure;
+  base *= (qual.exposure + gm.exposureBonus);
   base *= (0.85 + (qual.reviewScore/5.0)*0.3); // 0.85~1.15
 
   // 쿠폰은 플랫폼 노출에 가중
@@ -742,6 +855,9 @@ function demandOrdersForDay(){
 
   // 전화 배달비가 낮으면 전환 및 수요 약간+
   if(ph.deliveryFeeChargedToCustomer <= ph.lowDeliveryFeeThreshold) base *= (1 + 0.03);
+
+  // 액션/게임 보정
+  base *= gm.demand;
 
   // 랜덤 변동
   const noise = 0.85 + Math.random()*0.35; // 0.85~1.20
@@ -767,6 +883,7 @@ function simulateDay(){
   if(GAME_OVER) return;
 
   const dayNo = state.time.totalDays + 1;
+  ensureDayQuest(dayNo);
 
   // (A) 일일 마케팅비
   if(state.channels.phone.marketingOn){
@@ -787,6 +904,7 @@ function simulateDay(){
   let boost = 0;
   if(state.channels.phone.marketingOn) boost += state.channels.phone.conversionBoostWhenMarketingOn;
   if(state.channels.phone.deliveryFeeChargedToCustomer <= state.channels.phone.lowDeliveryFeeThreshold) boost += state.channels.phone.conversionBoostWhenLowDeliveryFee;
+  boost += state.gameplay.modifiers.phoneMixBoost;
   // boost는 "퍼센트포인트"로 적용(최대 20%p로 제한)
   boost = clamp(boost, 0, 0.20);
   mixH = clamp(mixH + boost, 0, 0.85);
@@ -850,6 +968,7 @@ function simulateDay(){
   let complaintMult = 1.0;
   if(fatigue>=85) complaintMult *= state.store.fatigue.effects.over85.complaintMultiplier;
   else if(fatigue>=70) complaintMult *= state.store.fatigue.effects.over70.complaintMultiplier;
+  complaintMult *= state.gameplay.modifiers.complaint;
 
   const complaints = Math.max(0, Math.round(orders * baseComplaintRate * complaintMult));
   const refunds = Math.round(complaints * item.refundRateIfComplaint);
@@ -859,25 +978,16 @@ function simulateDay(){
   const netSalesPerOrder = (price - coupon) + reviewUp;
   const phoneDeliveryFee = state.channels.phone.deliveryFeeChargedToCustomer;
 
-  const grossSales =
-    platformOrders * netSalesPerOrder +
-    storeOrders * netSalesPerOrder +
-    phoneOrders * (netSalesPerOrder + phoneDeliveryFee);
+  const grossSales = (platformOrders + storeOrders) * netSalesPerOrder + phoneOrders * (netSalesPerOrder + phoneDeliveryFee);
 
-  // 변동비: 원가(음식+포장)+리뷰비용 + (플랫폼수수료/결제수수료) + 배달비
-  // 원가는 취소 제외된 orders 기준
-  const actualOrders = platformOrders + phoneOrders + storeOrders;
-
-  // 원가 결제(카드 가능)
-  const cogs = actualOrders * (foodCost + packCost) + actualOrders * reviewCost;
-  pay(cogs, "ingredients", "식자재/포장/리뷰비");
+  // 원가
+  const cogs = orders * (foodCost + packCost) + reviewCost*orders + wasteOrders*(foodCost+packCost);
 
   // 플랫폼 수수료
-  const pf = state.channels.platform;
-  const platformGMV = platformOrders * (price - coupon + reviewUp); // 간단 GMV
-  const platformFee = platformGMV * pf.feeRate + platformGMV * pf.paymentFeeRate + platformOrders * pf.fixedPerOrderFee;
+  const platformFee = platformOrders * netSalesPerOrder * (state.channels.platform.feeRate + state.channels.platform.paymentFeeRate);
   pay(platformFee, "platform_fee", "플랫폼 수수료");
 
+  // 전화 주문은 수수료 없음
   // 가게배달(대행 vs 직접)
   const selfOrders = Math.round(storeOrders * selfShare);
   const agencyOrders = storeOrders - selfOrders;
@@ -906,7 +1016,7 @@ function simulateDay(){
   );
 
   // 리뷰는 클레임/환불/취소가 있으면 하락, 없으면 소폭 상승
-  let reviewDelta = 0.00;
+  let reviewDelta = 0.00 + state.gameplay.modifiers.reviewBonus;
   reviewDelta -= complaints*0.01;
   reviewDelta -= cancelled*0.005;
   reviewDelta += Math.min(0.03, actualOrders*0.0003);
@@ -921,6 +1031,18 @@ function simulateDay(){
   // 비용 합산은 “오늘 결제된 비용”을 정확히 추적하려면 분개가 필요. v1에서는 추정치로 기록:
   const estCosts = cogs + platformFee + agencyCost + selfVarCost + refundLoss;
   const profit = grossSales - estCosts;
+
+  LAST_DAY_RESULT = {
+    dayNo,
+    orders: actualOrders,
+    profit,
+    review: state.store.quality.reviewScore,
+    cancelled,
+    exposure: state.store.quality.exposure
+  };
+
+  grantXp(Math.max(0, Math.floor(profit/10000)), "일일 손익");
+  checkQuestCompletion(LAST_DAY_RESULT);
 
   state.kpis.daily.push({
     dayGlobal: dayNo,
@@ -957,6 +1079,8 @@ function simulateDay(){
     `주문 ${actualOrders} · 취소 ${cancelled} · 리뷰 ${state.store.quality.reviewScore.toFixed(2)} · 노출 ${state.store.quality.exposure.toFixed(2)}`;
 
   logLine(sum);
+
+  resetDailyGameplay();
 
   // (L) 시간 이동
   state.time.totalDays += 1;
@@ -1119,7 +1243,7 @@ function checkGameOver(){
 
   // 버튼 잠금
   if(GAME_OVER){
-    ["btnNextDay","btnNext7","btnFinishMonth","btnHire","btnFire","btnMk","btnBulk"].forEach(id=>$(id).disabled=true);
+    ["btnNextDay","btnNext7","btnFinishMonth","btnHire","btnFire","btnMk","btnBulk","btnActionRush","btnActionQuality","btnActionCommunity"].forEach(id=>$(id).disabled=true);
     $("todaySummary").innerHTML = `<span class="bad"><b>GAME OVER</b></span> · 로그를 확인하고 설정을 조정한 뒤 초기화하세요.`;
   }
 }
@@ -1156,6 +1280,7 @@ function refreshHUD(){
   syncMixLabels();
 
   refreshEmpLabel();
+  refreshGameUI();
 }
 
 function refreshTables(){
@@ -1253,7 +1378,8 @@ $("btnFinishMonth").addEventListener("click", ()=>{
 $("btnReset").addEventListener("click", ()=>{
   state = deepClone(INITIAL_STATE);
   GAME_OVER = false;
-  ["btnNextDay","btnNext7","btnFinishMonth","btnHire","btnFire","btnMk","btnBulk"].forEach(id=>$(id).disabled=false);
+  LAST_DAY_RESULT = null;
+  ["btnNextDay","btnNext7","btnFinishMonth","btnHire","btnFire","btnMk","btnBulk","btnActionRush","btnActionQuality","btnActionCommunity"].forEach(id=>$(id).disabled=false);
   clearLog();
   $("todaySummary").textContent="-";
   $("lblMk").textContent="OFF";
@@ -1262,6 +1388,7 @@ $("btnReset").addEventListener("click", ()=>{
   refreshSettingsForm();
   refreshTables();
   refreshJsonBox();
+  refreshGameUI();
   logLine("🔁 초기화 완료");
 });
 
@@ -1397,6 +1524,156 @@ function init(){
   logLine("팁) ‘설정(현실값)’에서 임대료/급여/수수료를 맞춘 뒤 돌리면 체감이 정확해짐.");
 }
 init();
+
+/** =========================
+ *  16) 게임플레이 레이어
+ *  ========================= */
+function levelTitle(level){
+  if(level>=8) return "본사 최상위";
+  if(level>=6) return "프랜차이즈 리더";
+  if(level>=4) return "상권의 강자";
+  if(level>=3) return "지역 강자";
+  if(level>=2) return "골목 고수";
+  return "골목 신입";
+}
+
+function grantXp(amount, reason){
+  if(amount<=0) return;
+  state.gameplay.xp += amount;
+  logLine(`✨ XP +${amount} (${reason})`);
+  while(state.gameplay.xp >= state.gameplay.xpToNext){
+    state.gameplay.xp -= state.gameplay.xpToNext;
+    state.gameplay.level += 1;
+    state.gameplay.xpToNext = Math.round(state.gameplay.xpToNext * 1.2 + 20);
+    logLine(`🏆 레벨 업! 현재 Lv.${state.gameplay.level}`);
+  }
+}
+
+function ensureDayQuest(dayNo){
+  if(state.gameplay.dayQuest && state.gameplay.dayQuest.dayNo === dayNo) return;
+  state.gameplay.dayQuest = rollDayQuest(dayNo);
+}
+
+function rollDayQuest(dayNo){
+  const questPool = [
+    {
+      id:"orders",
+      title:"주문 러시",
+      desc:(target)=>`오늘 주문 ${target}건 이상 달성`,
+      targetBase:28,
+      reward:{ cash:30000, xp:20, credit:2 }
+    },
+    {
+      id:"profit",
+      title:"흑자 수비",
+      desc:(target)=>`오늘 손익 ${money(target)} 이상 달성`,
+      targetBase:40000,
+      reward:{ cash:20000, xp:25, credit:3 }
+    },
+    {
+      id:"review",
+      title:"평점 방어",
+      desc:(target)=>`리뷰 ${target.toFixed(2)} 이상 유지`,
+      targetBase:4.55,
+      reward:{ cash:15000, xp:18, credit:2 }
+    }
+  ];
+  const pick = questPool[Math.floor(Math.random()*questPool.length)];
+  const scale = 1 + (state.gameplay.level-1)*0.08;
+  const target = pick.id==="review" ? Math.min(4.9, pick.targetBase + (state.gameplay.level-1)*0.03) : Math.round(pick.targetBase * scale);
+  return {
+    id: pick.id,
+    title: pick.title,
+    desc: pick.desc(target),
+    target,
+    reward: pick.reward,
+    dayNo,
+    completed:false
+  };
+}
+
+function checkQuestCompletion(result){
+  const quest = state.gameplay.dayQuest;
+  if(!quest || quest.completed) return;
+  let success = false;
+  if(quest.id==="orders") success = result.orders >= quest.target;
+  if(quest.id==="profit") success = result.profit >= quest.target;
+  if(quest.id==="review") success = result.review >= quest.target;
+  if(success){
+    quest.completed = true;
+    state.gameplay.completedQuests += 1;
+    state.finance.cash += quest.reward.cash;
+    state.finance.creditScore = clamp(state.finance.creditScore + quest.reward.credit, state.finance.creditScoreMin, state.finance.creditScoreMax);
+    grantXp(quest.reward.xp, "미션 보상");
+    logLine(`🎯 미션 완료! 보상 ${money(quest.reward.cash)} + XP ${quest.reward.xp}`);
+  }
+}
+
+function resetDailyGameplay(){
+  state.gameplay.actionPoints = state.gameplay.actionPointsMax;
+  state.gameplay.modifiers = { demand:1.0, complaint:1.0, reviewBonus:0.0, phoneMixBoost:0.0, exposureBonus:0.0 };
+}
+
+function useAction(actionId){
+  if(GAME_OVER) return;
+  if(state.gameplay.actionPoints <= 0){
+    logLine("⚠️ 액션 포인트가 부족합니다.");
+    return;
+  }
+  if(actionId==="rush"){
+    pay(30000, "marketing", "러시 아워 프로모션");
+    state.gameplay.modifiers.demand *= 1.10;
+    state.gameplay.modifiers.exposureBonus += 0.06;
+    logLine("🔥 러시 아워 프로모션 발동!");
+  }
+  if(actionId==="quality"){
+    pay(15000, "supplies", "품질 집중 모드");
+    state.gameplay.modifiers.complaint *= 0.80;
+    state.gameplay.modifiers.reviewBonus += 0.05;
+    logLine("🧪 품질 집중 모드 발동!");
+  }
+  if(actionId==="community"){
+    pay(10000, "marketing", "동네 제휴 이벤트");
+    state.gameplay.modifiers.phoneMixBoost += 0.08;
+    state.gameplay.modifiers.reviewBonus += 0.03;
+    logLine("🤝 동네 제휴 이벤트 발동!");
+  }
+  state.gameplay.actionPoints -= 1;
+  refreshGameUI();
+}
+
+function refreshGameUI(){
+  if(!$("tabGame")) return;
+  const gp = state.gameplay;
+  $("gameLevel").textContent = gp.level;
+  $("gameTitle").textContent = levelTitle(gp.level);
+  $("xpText").textContent = `XP ${gp.xp} / ${gp.xpToNext}`;
+  $("xpBar").style.width = `${Math.min(100, Math.round((gp.xp / gp.xpToNext) * 100))}%`;
+  $("apText").textContent = gp.actionPoints;
+
+  if(!gp.dayQuest) gp.dayQuest = rollDayQuest(state.time.totalDays+1);
+  const quest = gp.dayQuest;
+  $("questDesc").textContent = `${quest.title} · ${quest.desc}`;
+  $("questRewards").innerHTML = `
+    <span class="chip">현금 ${money(quest.reward.cash)}</span>
+    <span class="chip">XP +${quest.reward.xp}</span>
+    <span class="chip">신용도 +${quest.reward.credit}</span>
+  `;
+  const status = quest.completed ? "✅ 완료" : "⏳ 진행중";
+  $("questStatus").textContent = `상태: ${status}`;
+
+  const achievements = [
+    `완료 미션: ${gp.completedQuests}회`,
+    `총 누적일: ${state.time.totalDays}일`,
+    `현재 리뷰: ${state.store.quality.reviewScore.toFixed(2)}`,
+    `최근 손익: ${LAST_DAY_RESULT ? money(LAST_DAY_RESULT.profit) : "기록 없음"}`
+  ];
+  $("achievementList").innerHTML = achievements.map(a=>`• ${a}`).join("<br>");
+}
+
+$("btnActionRush").addEventListener("click", ()=>useAction("rush"));
+$("btnActionQuality").addEventListener("click", ()=>useAction("quality"));
+$("btnActionCommunity").addEventListener("click", ()=>useAction("community"));
 </script>
 </body>
 
